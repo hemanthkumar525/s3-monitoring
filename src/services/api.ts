@@ -1,6 +1,10 @@
 import axios from 'axios';
 import { APIResponse, S3BucketCreate } from '../types';
 
+// --------------------------------------------------
+// API URL
+// --------------------------------------------------
+
 const API_URL = import.meta.env.VITE_API_URL;
 
 if (!API_URL) {
@@ -8,6 +12,46 @@ if (!API_URL) {
     'VITE_API_URL is missing from .env'
   );
 }
+
+console.log('API URL:', API_URL);
+
+// --------------------------------------------------
+// Axios Instance
+// --------------------------------------------------
+
+const apiClient = axios.create({
+  baseURL: API_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// --------------------------------------------------
+// Normalize API Gateway Response
+// --------------------------------------------------
+
+const normalizeResponse = (data: any) => {
+
+  console.log('RAW RESPONSE:', data);
+
+  // Lambda Proxy Integration
+  if (data?.body) {
+
+    if (typeof data.body === 'string') {
+      try {
+        return JSON.parse(data.body);
+      } catch {
+        return data.body;
+      }
+    }
+
+    return data.body;
+  }
+
+  return data;
+};
+
 // --------------------------------------------------
 // GET Monitoring Data
 // --------------------------------------------------
@@ -18,34 +62,34 @@ export const fetchMonitoringData =
     try {
 
       const response =
-        await axios.get(API_URL);
+        await apiClient.get('/');
+
+      const normalized =
+        normalizeResponse(response.data);
 
       console.log(
-        'RAW API RESPONSE:',
-        response.data
+        'MONITORING DATA:',
+        normalized
       );
 
-      // --------------------------------
-      // Handle API Gateway Proxy Format
-      // --------------------------------
+      return normalized;
 
-      if (response.data.body) {
-
-        return typeof response.data.body === 'string'
-          ? JSON.parse(response.data.body)
-          : response.data.body;
-      }
-
-      return response.data;
-
-    } catch (error) {
+    } catch (error: any) {
 
       console.error(
-        'API Error:',
+        'GET Monitoring Error:',
         error
       );
 
-      throw error;
+      console.error(
+        'GET Error Response:',
+        error?.response?.data
+      );
+
+      throw new Error(
+        error?.response?.data?.message ||
+        'Failed to fetch monitoring data'
+      );
     }
 };
 
@@ -60,43 +104,46 @@ export const createBucket =
 
     try {
 
-      const response =
-        await axios.post(
-          API_URL,
-          payload,
-          {
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-          }
-        );
-
       console.log(
-        'CREATE BUCKET RESPONSE:',
-        response.data
+        'CREATE BUCKET PAYLOAD:',
+        payload
       );
 
-      // --------------------------------
-      // Handle API Gateway Proxy Format
-      // --------------------------------
+      const response =
+        await apiClient.post(
+          '/',
+          payload
+        );
 
-      if (response.data.body) {
+      const normalized =
+        normalizeResponse(response.data);
 
-        return typeof response.data.body === 'string'
-          ? JSON.parse(response.data.body)
-          : response.data.body;
-      }
+      console.log(
+        'CREATE BUCKET SUCCESS:',
+        normalized
+      );
 
-      return response.data;
+      return normalized;
 
-    } catch (error) {
+    } catch (error: any) {
 
       console.error(
-        'Create Bucket Error:',
+        'CREATE BUCKET ERROR:',
         error
       );
 
-      throw error;
+      console.error(
+        'CREATE BUCKET RESPONSE:',
+        error?.response?.data
+      );
+
+      // Better frontend error handling
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'Bucket creation failed';
+
+      throw new Error(message);
     }
 };
