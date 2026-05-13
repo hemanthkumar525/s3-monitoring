@@ -1,93 +1,84 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  AlertCircle, 
-  Zap
+import {
+  AlertCircle,
+  Activity,
+  Database,
+  DollarSign,
+  ShieldCheck,
+  BarChart3,
+  Clock3,
+  RefreshCw,
 } from 'lucide-react';
+
 import { motion, AnimatePresence } from 'motion/react';
+
 import { Navbar } from '../components/Navbar';
 import { Sidebar } from '../components/Sidebar';
 import { S3BucketCard } from '../components/S3BucketCard';
 import { AIAnalysis } from '../components/AIAnalysis';
 import { ArchitectureBanner } from '../components/ArchitectureBanner';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
+
 import { fetchMonitoringData } from '../services/api';
 import { APIResponse } from '../types';
 
-const MOCK_DATA: APIResponse = {
-  monitoring_data: {
-    timestamp: "2026-05-07 19:44:38.752769",
-    s3_buckets: [
-      { name: "cdk-hnb659fds-assets-831009602174-us-east-1", created: "2026-05-07 18:48:42+00:00" },
-      { name: "codepipeline-us-east-1-b025b9fed094-4526-a726-8c037a9a5605", created: "2026-04-18 18:31:52+00:00" },
-      { name: "heman-portfolio", created: "2026-04-18 17:47:46+00:00" },
-      { name: "rms-demo-831009602174-us-east-1-an", created: "2026-04-20 12:25:07+00:00" }
-    ],
-    cloudtrail_events: [
-      { event: "ListStacks", user: "Hemanth", time: "2026-05-07 19:42:40+00:00" },
-      { event: "ListStacks", user: "Hemanth", time: "2026-05-07 19:41:40+00:00" },
-      { event: "ListStacks", user: "Hemanth", time: "2026-05-07 19:41:19+00:00" },
-      { event: "ListManagedNotificationEvents", user: "Hemanth", time: "2026-05-07 19:41:19+00:00" },
-      { event: "ListManagedNotificationEvents", user: "Hemanth", time: "2026-05-07 19:41:19+00:00" },
-      { event: "GetEnvironmentStatus", user: "Hemanth", time: "2026-05-07 19:41:14+00:00" },
-      { event: "DeleteSession", user: "Hemanth", time: "2026-05-07 19:41:13+00:00" },
-      { event: "ListStacks", user: "Hemanth", time: "2026-05-07 19:40:39+00:00" },
-      { event: "ListRetirableGrants", user: "9d1e91d3-0826-4afc-b216-280d9d5cd4ac", time: "2026-05-07 19:40:21+00:00" },
-      { event: "AssumeRole", user: "Unknown", time: "2026-05-07 19:40:21+00:00" }
-    ],
-    cloudwatch_metrics: {
-      metric_count: 6
-    }
-  },
-  ai_analysis: "Okay, let’s analyze this AWS monitoring data.\n\n**Summary:**\n\nThe data indicates activity primarily attributed to a user named \"Hemanth\" within the US-East-1 region. We observe the creation of several S3 buckets, including one potentially related to CDK deployments (cdk-hnb659fds-assets-831009602174-us-east-1), a codepipeline bucket, and a personal portfolio bucket (heman-portfolio).  Furthermore, Hemanth is performing a high volume of `ListStacks` operations within a short timeframe – occurring multiple times between 19:40 and 19:44.  There’s also an `AssumeRole` event with an unknown user ID, raising a potential security concern.\n\n**Suspicious Activity Detection:**\n\n*   **High Frequency `ListStacks` Calls:** The repeated `ListStacks` calls by Hemanth in a short period (19:40-19:44) are noteworthy. While listing stacks is a legitimate operation, the frequency suggests a potentially intensive investigation or scanning of AWS resources. Without further context, it is difficult to determine if this is normal behavior.\n*   **Unknown `AssumeRole` User:** The `AssumeRole` event with an “Unknown” user ID should be investigated immediately. This signifies that someone is assuming an IAM role without clear identification. A role assumption is a key security control, and an unknown user exploiting it could indicate unauthorized access. \n\n**Recommendations:**\n\n1.  **Investigate Hemanth’s Activity:** Immediately review Hemanth's recent activity logs (CloudTrail, S3 access) to understand the scope and purpose of these `ListStacks` calls.  Determine if this is part of a legitimate deployment process, or if it's indicative of reconnaissance or malicious activity.\n2.  **Investigate `AssumeRole` Event:** Determine the IAM role that was assumed by the \"Unknown\" user.  Audit the role's permissions.  If the role has overly permissive access, immediately restrict those permissions.  Analyze the timing of the role assumption to see if it aligns with Hemanth's activity.\n3.  **S3 Bucket Review:** Examine the newly created S3 buckets. Assess their purpose and ensure they align with expected business needs. The `cdk-hnb659fds-assets-831009602174-us-east-1` bucket, linked to CDK suggests infrastructure deployments, ensure it's part of managed processes. Monitor the bucket for any unexpected data uploads or downloads.\n4.  **CloudTrail Deeper Dive:** Examine additional CloudTrail events around the same timeframe for any related activity – API calls to other services, changes to IAM policies, etc.\n5.  **User Context:** Confirm the identity of \"Hemanth\". Are they a legitimate employee with appropriate access?"
-};
-
 export default function Dashboard() {
   const [data, setData] = useState<APIResponse | null>(null);
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState<string | null>(null);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Helper to parse AI analysis if it's JSON-like string
+  // =========================================
+  // Parse AI Analysis
+  // =========================================
+
   const parseAIAnalysis = (analysis: string) => {
     try {
-      if (analysis.includes("'choices':") && analysis.includes("'content':")) {
-        // Attempt to extract the content part directly as it's not standard JSON (Python dict style)
+      if (
+        analysis.includes("'choices':") &&
+        analysis.includes("'content':")
+      ) {
         const match = analysis.match(/'content':\s*'([^']*)'/);
+
         if (match && match[1]) {
-          return match[1].replace(/\\n/g, '\n').replace(/\\u[0-9a-f]{4}/g, (c) => String.fromCharCode(parseInt(c.slice(2), 16)));
+          return match[1]
+            .replace(/\\n/g, '\n')
+            .replace(
+              /\\u[0-9a-f]{4}/g,
+              (c) =>
+                String.fromCharCode(
+                  parseInt(c.slice(2), 16)
+                )
+            );
         }
       }
+
       return analysis;
     } catch {
       return analysis;
     }
   };
 
-  const loadData = useCallback(async (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    setIsRefreshing(true);
+  // =========================================
+  // Load Monitoring Data
+  // =========================================
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
     setError(null);
+    setIsRefreshing(true);
 
     try {
-      // In a real scenario, this would use fetchMonitoringData().
-      // For the demo preview, we allow fallback to mock data if API is not set.
-      if (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== 'https://api.example.com/v1') {
-        const result = await fetchMonitoringData();
-        setData(result);
-        setError(null);
-      } else {
-        // Simulating network delay for demo
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setData(MOCK_DATA);
-        setError(null);
-      }
+      const result = await fetchMonitoringData();
+
+      setData(result);
     } catch (err) {
-      // If the real API fails, we log it and show mock data
-      console.warn("API Fetch failed, falling back to demo mode", err);
-      setData(MOCK_DATA);
-      setError("Note: Using offline demo data. API connection inhibited.");
-      // Clear the error after a few seconds so it doesn't clutter the UI indefinitely
-      setTimeout(() => setError(null), 5000);
+      console.error(err);
+
+      setError('Failed to fetch monitoring data');
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -98,116 +89,558 @@ export default function Dashboard() {
     loadData();
   }, [loadData]);
 
+  // =========================================
+  // Derived Metrics
+  // =========================================
+
+  const bucketCount =
+    data?.monitoring_data?.s3_buckets?.length || 0;
+
+  const metricCount =
+    data?.monitoring_data?.cloudwatch_metrics
+      ?.metric_count || 0;
+
+  const eventCount =
+    data?.monitoring_data?.cloudtrail_events
+      ?.length || 0;
+
+  const monthlyCost =
+    data?.monitoring_data?.s3_billing
+      ?.monthly_cost || 0;
+
+  const secureBuckets =
+    data?.monitoring_data?.s3_buckets?.filter(
+      (bucket) => bucket.security === 'secure'
+    ).length || 0;
+
+  // =========================================
+  // UI
+  // =========================================
+
   return (
-    <div className="flex h-screen overflow-hidden bg-brand-bg text-white">
+    <div className="flex h-screen overflow-hidden bg-[#0B1120] text-white">
+      {/* Sidebar */}
+
       <Sidebar />
-      
+
+      {/* Main Content */}
+
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        {/* Navbar }
+
         <Navbar />
-        
-        <div className="flex-1 p-8 space-y-6 max-w-7xl mx-auto w-full">
-          {/* Hero Section */}
-          <section className="relative overflow-hidden bg-gradient-to-r from-[#1E293B] to-[#0F172A] rounded-2xl p-8 border border-white/10 shadow-2xl group">
-            <div className="relative z-10 space-y-2">
-              <p className="text-orange-400 text-sm font-bold uppercase tracking-[0.2em] mb-1">Operational Overview</p>
-              <h2 className="text-3xl font-bold text-white tracking-tight">Human-Governed AI Operations</h2>
-              <p className="text-slate-400 max-w-xl font-medium leading-relaxed">
-                Real-time analysis of AWS Cloud assets using autonomous MCP agents with direct human oversight and governance protocols.
-              </p>
-            </div>
-            <div className="absolute right-0 top-0 h-full w-1/3 opacity-10 pointer-events-none group-hover:opacity-20 transition-opacity">
-              <svg fill="currentColor" viewBox="0 0 100 100" className="w-full h-full text-slate-400"><circle cx="50" cy="50" r="40"/></svg>
+
+        {/* Content */}
+
+        <div className="flex-1 p-6 xl:p-8 space-y-6 max-w-[1800px] mx-auto w-full">
+          {/* ========================================= */}
+          {/* Header */}
+          {/* ========================================= */}
+
+          <section className="bg-[#111827] border border-[#1F2937] rounded-2xl p-6 shadow-xl">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-blue-400 font-semibold mb-2">
+                  Enterprise Infrastructure Monitoring
+                </p>
+
+                <h1 className="text-3xl font-bold tracking-tight">
+                  AWS Monitoring Dashboard
+                </h1>
+
+                <p className="text-slate-400 mt-2 max-w-2xl">
+                  Real-time telemetry, infrastructure
+                  analysis, security posture monitoring,
+                  and AWS cost intelligence.
+                </p>
+              </div>
+
+              <button
+                onClick={loadData}
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 transition-all duration-200 px-5 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/20"
+              >
+                <RefreshCw
+                  size={16}
+                  className={
+                    isRefreshing
+                      ? 'animate-spin'
+                      : ''
+                  }
+                />
+
+                Refresh Data
+              </button>
             </div>
           </section>
 
+          {/* ========================================= */}
+          {/* Error */}
+          {/* ========================================= */}
+
           <AnimatePresence>
             {error && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  height: 0,
+                }}
+                animate={{
+                  opacity: 1,
+                  height: 'auto',
+                }}
+                exit={{
+                  opacity: 0,
+                  height: 0,
+                }}
                 className="overflow-hidden"
               >
-                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between text-amber-400">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <AlertCircle size={18} />
-                    <p className="text-xs font-bold uppercase tracking-wider">{error}</p>
+                    <AlertCircle
+                      size={18}
+                      className="text-red-400"
+                    />
+
+                    <p className="text-sm text-red-300">
+                      {error}
+                    </p>
                   </div>
-                  <button onClick={() => setError(null)} className="text-[10px] uppercase font-black tracking-widest hover:text-white">Dismiss</button>
+
+                  <button
+                    onClick={() => setError(null)}
+                    className="text-xs text-red-300 hover:text-white transition-colors"
+                  >
+                    Dismiss
+                  </button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {loading ? <LoadingSkeleton /> : (
-            <div className="grid grid-cols-12 gap-6">
-              {/* Left Column: AI and Architecture */}
-              <div className="col-span-12 lg:col-span-8 space-y-6">
-                <AIAnalysis 
-                  analysis={parseAIAnalysis(data?.ai_analysis || "Processing AI stream...")} 
-                  bucketCount={data?.monitoring_data.s3_buckets.length || 0}
-                  metricCount={data?.monitoring_data.cloudwatch_metrics.metric_count || 0}
-                />
-                
-                <section className="space-y-6">
-                  <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                        <Zap size={14} className="text-brand-aws" />
-                        Recent CloudTrail Events
-                      </h3>
-                      <span className="text-[10px] text-slate-500 font-mono italic">Real-time Feed</span>
+          {/* ========================================= */}
+          {/* Loading */}
+          {/* ========================================= */}
+
+          {loading ? (
+            <LoadingSkeleton />
+          ) : (
+            <>
+              {/* ========================================= */}
+              {/* KPI Cards */}
+              {/* ========================================= */}
+
+              <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
+                {/* Monthly Cost */}
+
+                <div className="bg-[#111827] border border-[#1F2937] rounded-2xl p-5 shadow-xl">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-slate-400 font-medium">
+                        Monthly Cost
+                      </p>
+
+                      <h2 className="text-4xl font-bold mt-4">
+                        $
+                        {monthlyCost.toFixed(2)}
+                      </h2>
+
+                      <p className="text-emerald-400 text-sm mt-2">
+                        Amazon S3 Billing
+                      </p>
                     </div>
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-none font-mono">
-                      {data?.monitoring_data.cloudtrail_events.map((event, i) => (
-                        <div key={i} className="flex items-center justify-between p-2 rounded bg-slate-900/50 border border-white/5 hover:bg-white/5 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <span className="text-[10px] text-blue-400 font-bold w-24 truncate">{event.event}</span>
-                            <span className="text-[10px] text-slate-500">by</span>
-                            <span className="text-[10px] text-slate-300 font-bold">{event.user}</span>
+
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                      <DollarSign
+                        size={22}
+                        className="text-emerald-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* S3 Buckets */}
+
+                <div className="bg-[#111827] border border-[#1F2937] rounded-2xl p-5 shadow-xl">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-slate-400 font-medium">
+                        S3 Buckets
+                      </p>
+
+                      <h2 className="text-4xl font-bold mt-4">
+                        {bucketCount}
+                      </h2>
+
+                      <p className="text-blue-400 text-sm mt-2">
+                        Active Resources
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                      <Database
+                        size={22}
+                        className="text-blue-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* CloudTrail Events */}
+
+                <div className="bg-[#111827] border border-[#1F2937] rounded-2xl p-5 shadow-xl">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-slate-400 font-medium">
+                        Events
+                      </p>
+
+                      <h2 className="text-4xl font-bold mt-4">
+                        {eventCount}
+                      </h2>
+
+                      <p className="text-orange-400 text-sm mt-2">
+                        CloudTrail Logs
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                      <Activity
+                        size={22}
+                        className="text-orange-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metrics */}
+
+                <div className="bg-[#111827] border border-[#1F2937] rounded-2xl p-5 shadow-xl">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-slate-400 font-medium">
+                        Metrics
+                      </p>
+
+                      <h2 className="text-4xl font-bold mt-4">
+                        {metricCount}
+                      </h2>
+
+                      <p className="text-violet-400 text-sm mt-2">
+                        CloudWatch Signals
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
+                      <BarChart3
+                        size={22}
+                        className="text-violet-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Security */}
+
+                <div className="bg-[#111827] border border-[#1F2937] rounded-2xl p-5 shadow-xl">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-slate-400 font-medium">
+                        Secure Buckets
+                      </p>
+
+                      <h2 className="text-4xl font-bold mt-4">
+                        {secureBuckets}
+                      </h2>
+
+                      <p className="text-emerald-400 text-sm mt-2">
+                        Security Healthy
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                      <ShieldCheck
+                        size={22}
+                        className="text-emerald-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* ========================================= */}
+              {/* Main Grid */}
+              {/* ========================================= */}
+
+              <section className="grid grid-cols-12 gap-6">
+                {/* ========================================= */}
+                {/* Left Column */}
+                {/* ========================================= */}
+
+                <div className="col-span-12 xl:col-span-8 space-y-6">
+                  {/* Cost Analysis */}
+
+                  <section className="bg-[#111827] border border-[#1F2937] rounded-2xl p-6 shadow-xl">
+                    <div className="flex items-center justify-between mb-8">
+                      <div>
+                        <h2 className="text-xl font-semibold">
+                          Cost Analysis
+                        </h2>
+
+                        <p className="text-slate-400 text-sm mt-1">
+                          Current AWS infrastructure
+                          spend overview
+                        </p>
+                      </div>
+
+                      <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl">
+                        <span className="text-emerald-400 text-sm font-semibold">
+                          {
+                            data?.monitoring_data
+                              ?.s3_billing
+                              ?.currency
+                          }
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                      <div className="bg-[#0B1220] border border-white/5 rounded-2xl p-5">
+                        <p className="text-sm text-slate-400">
+                          Current Monthly Cost
+                        </p>
+
+                        <h2 className="text-5xl font-bold mt-4">
+                          $
+                          {monthlyCost.toFixed(2)}
+                        </h2>
+                      </div>
+
+                      <div className="bg-[#0B1220] border border-white/5 rounded-2xl p-5">
+                        <p className="text-sm text-slate-400">
+                          Billing Service
+                        </p>
+
+                        <h2 className="text-2xl font-semibold mt-4">
+                          {
+                            data?.monitoring_data
+                              ?.s3_billing?.service
+                          }
+                        </h2>
+                      </div>
+
+                      <div className="bg-[#0B1220] border border-white/5 rounded-2xl p-5">
+                        <p className="text-sm text-slate-400">
+                          Billing Period
+                        </p>
+
+                        <h2 className="text-2xl font-semibold mt-4">
+                          {
+                            data?.monitoring_data
+                              ?.s3_billing
+                              ?.billing_period
+                          }
+                        </h2>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* AI Analysis */}
+
+                  <section className="bg-[#111827] border border-[#1F2937] rounded-2xl p-1 shadow-xl">
+                    <AIAnalysis
+                      analysis={parseAIAnalysis(
+                        data?.ai_analysis ||
+                          'No AI analysis available.'
+                      )}
+                      bucketCount={bucketCount}
+                      metricCount={metricCount}
+                    />
+                  </section>
+
+                  {/* CloudTrail Events */}
+
+                  <section className="bg-[#111827] border border-[#1F2937] rounded-2xl p-6 shadow-xl">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-xl font-semibold">
+                          CloudTrail Activity
+                        </h2>
+
+                        <p className="text-slate-400 text-sm mt-1">
+                          Real-time AWS audit event feed
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <Clock3 size={14} />
+                        Live Events
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                      {data?.monitoring_data?.cloudtrail_events?.map(
+                        (event, index) => (
+                          <div
+                            key={index}
+                            className="bg-[#0B1220] border border-white/5 rounded-xl p-4 hover:bg-white/[0.03] transition-all duration-200"
+                          >
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-blue-400 text-sm font-semibold">
+                                    {event.event}
+                                  </span>
+
+                                  <span className="text-slate-500 text-xs">
+                                    by
+                                  </span>
+
+                                  <span className="text-slate-300 text-xs">
+                                    {event.user}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="text-xs text-slate-500 whitespace-nowrap">
+                                {new Date(
+                                  event.time
+                                ).toLocaleTimeString()}
+                              </div>
+                            </div>
                           </div>
-                          <span className="text-[10px] text-slate-600">{new Date(event.time).toLocaleTimeString()}</span>
-                        </div>
-                      ))}
+                        )
+                      )}
                     </div>
-                  </div>
+                  </section>
 
-                  <div className="space-y-3">
-                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 text-center">Pipeline Flow</h3>
+                  {/* Architecture */}
+
+                  <section className="bg-[#111827] border border-[#1F2937] rounded-2xl p-6 shadow-xl">
+                    <div className="mb-5">
+                      <h2 className="text-xl font-semibold">
+                        Monitoring Architecture
+                      </h2>
+
+                      <p className="text-slate-400 text-sm mt-1">
+                        AWS monitoring and telemetry
+                        processing pipeline
+                      </p>
+                    </div>
+
                     <ArchitectureBanner />
-                  </div>
-                </section>
-              </div>
+                  </section>
+                </div>
 
-              {/* Right Column: Bucket List */}
-              <div className="col-span-12 lg:col-span-4 space-y-4">
-                <div className="flex items-center justify-between mb-2">
-                   <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Active Storage Resources</h2>
-                   <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded text-slate-500">{data?.monitoring_data.s3_buckets.length}</span>
+                {/* ========================================= */}
+                {/* Right Column */}
+                {/* ========================================= */}
+
+                <div className="col-span-12 xl:col-span-4 space-y-6">
+                  {/* Security Overview */}
+
+                  <section className="bg-[#111827] border border-[#1F2937] rounded-2xl p-6 shadow-xl">
+                    <div className="flex items-center justify-between mb-5">
+                      <div>
+                        <h2 className="text-xl font-semibold">
+                          Security Overview
+                        </h2>
+
+                        <p className="text-slate-400 text-sm mt-1">
+                          Infrastructure security posture
+                        </p>
+                      </div>
+
+                      <ShieldCheck className="text-emerald-400" />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="bg-[#0B1220] border border-white/5 rounded-xl p-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 text-sm">
+                            Secure Buckets
+                          </span>
+
+                          <span className="text-2xl font-bold text-emerald-400">
+                            {secureBuckets}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-[#0B1220] border border-white/5 rounded-xl p-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 text-sm">
+                            Total Resources
+                          </span>
+
+                          <span className="text-2xl font-bold text-blue-400">
+                            {bucketCount}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Bucket Inventory */}
+
+                  <section className="bg-[#111827] border border-[#1F2937] rounded-2xl p-6 shadow-xl">
+                    <div className="flex items-center justify-between mb-5">
+                      <div>
+                        <h2 className="text-xl font-semibold">
+                          Bucket Inventory
+                        </h2>
+
+                        <p className="text-slate-400 text-sm mt-1">
+                          Active S3 storage resources
+                        </p>
+                      </div>
+
+                      <div className="bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-lg text-blue-400 text-sm font-semibold">
+                        {bucketCount}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 max-h-[900px] overflow-y-auto pr-2">
+                      {data?.monitoring_data?.s3_buckets?.map(
+                        (bucket, index) => (
+                          <S3BucketCard
+                            key={bucket.name}
+                            bucket={bucket}
+                            index={index}
+                          />
+                        )
+                      )}
+                    </div>
+                  </section>
                 </div>
-                <div className="space-y-4 max-h-[800px] overflow-y-auto pr-2 scrollbar-none">
-                  {data?.monitoring_data.s3_buckets.map((bucket, i) => (
-                    <S3BucketCard key={bucket.name} bucket={bucket} index={i} />
-                  ))}
-                </div>
-              </div>
-            </div>
+              </section>
+            </>
           )}
         </div>
 
-        {/* Footer Status Bar */}
-        <footer className="h-10 bg-[#07080C] border-t border-white/5 flex items-center justify-between px-8 shrink-0">
+        {/* ========================================= */}
+        {/* Footer */}
+        {/* ========================================= */}
+
+        <footer className="h-12 border-t border-[#1F2937] bg-[#111827] flex items-center justify-between px-8 shrink-0">
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
-              API Status: <span className="text-slate-300">Connected to monitoring-api.mcp.aws</span>
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+
+              Monitoring API Connected
             </div>
-            <div className="text-[10px] text-slate-500 font-medium">
-              Network Latency: <span className="text-emerald-500 font-bold tracking-tighter">12ms</span>
+
+            <div className="text-xs text-slate-500">
+              AWS MCP Telemetry Stream
             </div>
           </div>
-          <div className="text-[10px] text-slate-600 italic font-mono tracking-tighter">
-            Last Telemetry Sync: {data?.monitoring_data.timestamp ? new Date(data.monitoring_data.timestamp).toLocaleString() : 'N/A'}
+
+          <div className="text-xs text-slate-500">
+            Last Sync:{' '}
+            {data?.monitoring_data?.timestamp
+              ? new Date(
+                  data.monitoring_data.timestamp
+                ).toLocaleString()
+              : 'N/A'}
           </div>
         </footer>
       </main>
