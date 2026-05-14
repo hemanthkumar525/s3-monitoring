@@ -1,12 +1,12 @@
 import {
-  Database,
-  ShieldCheck,
-  AlertTriangle,
-  Globe,
+  BrainCircuit,
+  Cpu,
+  Radio,
+  Layers3,
 } from 'lucide-react';
 
-export function S3BucketCard({
-  bucket,
+export function BedrockModelCard({
+  model,
 }: any) {
 
   return (
@@ -19,62 +19,67 @@ export function S3BucketCard({
 
           <div className="flex items-center gap-2">
 
-            <Database
+            <BrainCircuit
               size={16}
-              className="text-blue-400"
+              className="text-cyan-400"
             />
 
             <h3 className="font-medium text-sm">
-              {bucket.bucket_name}
+              {model.model_id}
             </h3>
           </div>
 
           <p className="text-xs text-slate-500 mt-2">
-            {bucket.region}
+            {model.provider}
           </p>
         </div>
 
-        <RiskBadge
-          level={bucket.risk_level}
-        />
+        <ModelBadge />
       </div>
 
       <div className="grid grid-cols-2 gap-3 mt-5">
 
         <StatusItem
-          label="Encryption"
+          label="Streaming"
           value={
-            bucket.encrypted
+            model.streaming_supported
           }
           positive="Enabled"
           negative="Disabled"
         />
 
         <StatusItem
-          label="Versioning"
+          label="Inference"
           value={
-            bucket.versioning
+            model.inference_types
+              ?.length > 0
           }
-          positive="Enabled"
-          negative="Disabled"
+          positive="Available"
+          negative="Unavailable"
         />
 
         <StatusItem
-          label="Public Access"
+          label="Input"
           value={
-            !bucket.public_access
+            model.input_modalities
+              ?.length > 0
           }
-          positive="Private"
-          negative="Public"
+          positive={
+            model.input_modalities?.join(', ')
+          }
+          negative="None"
         />
 
         <StatusItem
-          label="Lifecycle"
+          label="Output"
           value={
-            bucket.lifecycle_policy
+            model.output_modalities
+              ?.length > 0
           }
-          positive="Configured"
-          negative="Missing"
+          positive={
+            model.output_modalities?.join(', ')
+          }
+          negative="None"
         />
       </div>
     </div>
@@ -99,7 +104,7 @@ function StatusItem({
       <div
         className={`text-sm font-medium mt-1 ${
           value
-            ? 'text-emerald-400'
+            ? 'text-cyan-400'
             : 'text-red-400'
         }`}
       >
@@ -112,28 +117,22 @@ function StatusItem({
   );
 }
 
-function RiskBadge({
-  level,
-}: any) {
-
-  const styles: any = {
-
-    LOW:
-      'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-
-    MEDIUM:
-      'bg-orange-500/10 text-orange-400 border-orange-500/20',
-
-    HIGH:
-      'bg-red-500/10 text-red-400 border-red-500/20',
-  };
+function ModelBadge() {
 
   return (
 
     <span
-      className={`px-2 py-1 rounded-full text-xs border ${styles[level]}`}
+      className="
+        px-2 py-1
+        rounded-full
+        text-xs
+        border
+        bg-cyan-500/10
+        text-cyan-400
+        border-cyan-500/20
+      "
     >
-      {level}
+      FOUNDATION
     </span>
   );
 }

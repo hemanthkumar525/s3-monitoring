@@ -10,10 +10,7 @@ export const Navbar = () => {
       </div>
 
       <div className="flex items-center gap-4">
-        <button className="flex items-center gap-2 px-4 py-1.5 bg-orange-600 hover:bg-orange-500 rounded text-sm font-medium transition-colors text-white ring-1 ring-orange-400/20 shadow-lg shadow-orange-600/20">
-          <Zap size={14} className="fill-current" />
-          Sync Data
-        </button>
+        
         
         <div className="w-px h-6 bg-white/10 mx-2" />
         

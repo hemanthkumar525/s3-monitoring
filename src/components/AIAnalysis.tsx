@@ -49,9 +49,7 @@ export const AIAnalysis = ({ analysis, bucketCount, metricCount }: AIAnalysisPro
         </div>
       </div>
 
-      <div className="absolute right-0 top-0 h-full w-1/3 opacity-[0.03] pointer-events-none">
-        <BrainCircuit size={160} className="text-blue-400" />
-      </div>
+      
     </motion.div>
   );
 };

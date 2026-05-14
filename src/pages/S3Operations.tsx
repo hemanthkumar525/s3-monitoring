@@ -147,7 +147,7 @@ export default function S3Operations() {
               {loading ? <div className="h-64 glass rounded-2xl animate-pulse" /> : (
                 <AIAnalysis 
                   analysis={parseAIAnalysis(data?.ai_analysis || "Generating storage optimization strategy...")} 
-                  bucketCount={data?.monitoring_data.s3_buckets.length || 0}
+                  bucketCount={data?.monitoring_data.s3_monitoring.length || 0}
                   metricCount={data?.monitoring_data.cloudwatch_metrics.metric_count || 0}
                 />
               )}
@@ -194,10 +194,10 @@ export default function S3Operations() {
                 </div>
               ) : (
                 <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2 scrollbar-none pb-8">
-                  {data?.monitoring_data.s3_buckets.map((bucket, i) => (
-                    <S3BucketCard key={bucket.name} bucket={bucket} index={i} />
+                  {data?.monitoring_data.s3_monitoring.map((bucket, i) => (
+                    <S3BucketCard key={bucket.bucket_name} bucket={bucket} index={i} />
                   ))}
-                  {data?.monitoring_data.s3_buckets.length === 0 && (
+                  {data?.monitoring_data.s3_monitoring.length === 0 && (
                      <div className="p-12 text-center glass rounded-2xl space-y-4 border-dashed">
                         <Database size={48} className="mx-auto text-slate-700" />
                         <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">No active buckets detected</p>
@@ -209,7 +209,7 @@ export default function S3Operations() {
           </div>
         </div>
 
-        {/* Footer Status Bar fallback */}
+        {/* Footer Status Bar fallback 
         <footer className="h-10 bg-[#07080C] border-t border-white/5 flex items-center justify-between px-8 shrink-0">
           <div className="flex items-center gap-6">
             <div className="text-[10px] text-slate-500 font-medium">
@@ -224,7 +224,7 @@ export default function S3Operations() {
             Audit Stream Active
             <Activity size={12} className="text-brand-aws animate-pulse" />
           </div>
-        </footer>
+        </footer>*/}
 
         <CreateBucketModal 
           isOpen={isModalOpen} 
